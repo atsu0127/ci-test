@@ -1,0 +1,59 @@
+---
+# Copyright(C) 2024 Team Prelab
+
+name: "[Release]"
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release"
+        required: true
+
+env:
+  flutter_version: 3.22.2
+
+jobs:
+  ios:
+    name: "<iOS> Build & Upload"
+    runs-on: macos-14
+    timeout-minutes: 30
+
+    steps:
+      - name: "Git Checkout"
+        uses: actions/checkout@v4
+
+      - name: "Set up Flutter"
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.flutter_version }}
+          channel: stable
+
+      - name: "Install dependencies"
+        run: flutter pub get
+
+      - name: "Xcode Version"
+        run: xcodebuild -version
+
+      - name: "Import AuthKey (.p8) of AppStore Connect API"
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+        run: |
+          mkdir ~/private_keys
+          echo -n "$APPLE_API_KEY" | base64 --decode --output ~/private_keys/AuthKey_$APPLE_API_KEY_ID.p8
+
+      - name: "Build IPA"
+        run: |
+          VERSION=${{ github.event.inputs.version }}
+          BUILD_NUMBER=${{ github.run_number }}
+          echo "Version: $VERSION"
+          echo "Build Number: $BUILD_NUMBER"
+          flutter build ipa --export-options-plist ios/ExportOptions.plist --build-name=${VERSION} --build-number=${BUILD_NUMBER}
+
+      - name: "Upload to AppStore Connect"
+        run: |
+          ls -lh ~/private_keys
+          KEY_ID=${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID=${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          xcrun altool --upload-app -f build/ios/ipa/ci_test.ipa -t ios --apiKey ${KEY_ID} --apiIssuer ${ISSUER_ID}
