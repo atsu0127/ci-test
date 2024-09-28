@@ -45,7 +45,12 @@ jobs:
 
       - name: Run flutter build
         id: build
-        run: flutter build ios --release --no-codesign
+        run: |
+          VERSION=${{ github.event.inputs.version }}
+          BUILD_NUMBER=${{ github.run_number }}
+          echo "Version: $VERSION"
+          echo "Build Number: $BUILD_NUMBER"
+          flutter build ios --release --no-codesign --build-name=${VERSION} --build-number=${BUILD_NUMBER}
 
       - name: Archive by xcodebuild
         env:
